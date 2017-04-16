@@ -1,0 +1,85 @@
+From ff697f3b380c4743746c0d1cb66125e1e456bab8 Mon Sep 17 00:00:00 2001
+From: Abhinav-Reddy <abhinavpodduturi@ufl.edu>
+Date: Wed, 29 Mar 2017 08:33:08 -0400
+Subject: [PATCH] Correcting errors in Binary chain
+
+---
+ src/cop5556sp17/TypeCheckVisitor.java | 23 +++++++++--------------
+ 1 file changed, 9 insertions(+), 14 deletions(-)
+
+diff --git a/src/cop5556sp17/TypeCheckVisitor.java b/src/cop5556sp17/TypeCheckVisitor.java
+index e7625c4..583a5ce 100644
+--- a/src/cop5556sp17/TypeCheckVisitor.java
++++ b/src/cop5556sp17/TypeCheckVisitor.java
+@@ -38,18 +38,15 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 				binaryChain.setType(IMAGE);
+ 			}
+ 			else if (ch.getType().equals(FRAME) && 
+-					first.isAmongKind(KW_XLOC, KW_YLOC) &&
+-					ce.getFirstToken().isAmongKind(KW_SHOW, KW_HIDE, KW_MOVE, KW_XLOC, KW_YLOC)){
++					ce.getFirstToken().isAmongKind(KW_XLOC, KW_YLOC)){
+ 				binaryChain.setType(INTEGER);
+ 			}
+ 			else if (ch.getType().equals(FRAME) && 
+-					first.isAmongKind(KW_SHOW, KW_HIDE, KW_MOVE) &&
+-					ce.getFirstToken().isAmongKind(KW_SHOW, KW_HIDE, KW_MOVE, KW_XLOC, KW_YLOC)){
++					ce.getFirstToken().isAmongKind(KW_SHOW, KW_HIDE, KW_MOVE)){
+ 				binaryChain.setType(FRAME);
+ 			}
+ 			else if (ch.getType().equals(IMAGE) &&
+-					first.isAmongKind(OP_WIDTH, OP_HEIGHT) &&
+-					ce.getFirstToken().isAmongKind(OP_WIDTH, OP_HEIGHT, KW_SCALE)){
++					ce.getFirstToken().isAmongKind(OP_WIDTH, OP_HEIGHT)){
+ 						binaryChain.setType(INTEGER);
+ 					}
+ 			else if (ch.getType().equals(IMAGE) &&
+@@ -61,24 +58,24 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 						binaryChain.setType(NONE);
+ 					}
+ 			else if (ch.getType().equals(TypeName.IMAGE) &&
+-					first.isAmongKind(OP_GRAY, OP_BLUR, OP_CONVOLVE) &&
+-					ce.getFirstToken().isAmongKind(OP_WIDTH, OP_HEIGHT, KW_SCALE)){
++					ce.getFirstToken().isAmongKind(OP_GRAY, OP_BLUR, OP_CONVOLVE)){
+ 						binaryChain.setType(IMAGE);
+ 					}
+ 			else if (ch.getType().equals(TypeName.IMAGE) &&
+-					first.isKind(KW_SCALE) &&
+-					ce.getFirstToken().isAmongKind(OP_WIDTH, OP_HEIGHT, KW_SCALE)){
++					ce.getFirstToken().isAmongKind(KW_SCALE)){
+ 						binaryChain.setType(IMAGE);
+ 					}
+ 			else if (ch.getType().equals(TypeName.IMAGE) &&
+ 					ce.getFirstToken().isKind(IDENT)){
+ 						binaryChain.setType(IMAGE);
+ 					}
++			else{
++				throw new TypeCheckException("Error");
++			}
+ 		}
+ 		else if(t.isKind(BARARROW)){
+ 			if (ch.getType().equals(TypeName.IMAGE) &&
+-				first.isAmongKind(OP_GRAY, OP_BLUR, OP_CONVOLVE) &&
+-				ce.getFirstToken().isAmongKind(OP_WIDTH, OP_HEIGHT, KW_SCALE)){
++				ce.getFirstToken().isAmongKind(OP_GRAY, OP_BLUR, OP_CONVOLVE)){
+ 				binaryChain.setType(IMAGE);
+ 			}
+ 			else{
+@@ -207,7 +204,6 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 		// Implemented this
+ 		Token t = frameOpChain.firstToken;
+ 		Tuple tp = frameOpChain.getArg();
+-		frameOpChain.setType(Type.getTypeName(t));
+ 		if (t.isAmongKind(KW_SHOW, KW_HIDE)){
+ 			if (tp.getExprList().size() != 0){
+ 				throw new TypeCheckException("Error");
+@@ -368,7 +364,6 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 		// Implemented this
+ 		Token t = imageOpChain.firstToken;
+ 		Tuple tp = imageOpChain.getArg();
+-		imageOpChain.setType(Type.getTypeName(t));
+ 		if (t.isAmongKind(OP_WIDTH, OP_HEIGHT)){
+ 			if (tp.getExprList().size() != 0){
+ 				throw new TypeCheckException("Error");
+-- 
+1.9.1
+

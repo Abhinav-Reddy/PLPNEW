@@ -1,0 +1,433 @@
+From 19cfba97f134fa83276ce49522b64617fecae2f3 Mon Sep 17 00:00:00 2001
+From: Abhinav-Reddy <abhinavpodduturi@ufl.edu>
+Date: Sat, 18 Mar 2017 21:35:12 -0400
+Subject: [PATCH] completing code for tree traversal
+
+---
+ src/cop5556sp17/AST/Dec.java          |   6 +-
+ src/cop5556sp17/AST/Expression.java   |  12 +++
+ src/cop5556sp17/AST/IdentLValue.java  |   6 ++
+ src/cop5556sp17/SymbolTable.java      |  12 +--
+ src/cop5556sp17/TypeCheckVisitor.java | 145 +++++++++++++++++++++++++++-------
+ 5 files changed, 144 insertions(+), 37 deletions(-)
+
+diff --git a/src/cop5556sp17/AST/Dec.java b/src/cop5556sp17/AST/Dec.java
+index 671d5d6..8f12011 100644
+--- a/src/cop5556sp17/AST/Dec.java
++++ b/src/cop5556sp17/AST/Dec.java
+@@ -1,6 +1,8 @@
+ package cop5556sp17.AST;
+ 
++import cop5556sp17.Parser.SyntaxException;
+ import cop5556sp17.Scanner.Token;
++import cop5556sp17.AST.Type.TypeName;
+ 
+ public class Dec extends ASTNode {
+ 	
+@@ -12,8 +14,8 @@ public class Dec extends ASTNode {
+ 		this.ident = ident;
+ 	}
+ 
+-	public Token getType() {
+-		return firstToken;
++	public TypeName getType() throws SyntaxException {
++		return Type.getTypeName(firstToken);
+ 	}
+ 
+ 	public Token getIdent() {
+diff --git a/src/cop5556sp17/AST/Expression.java b/src/cop5556sp17/AST/Expression.java
+index 07f337a..0f170a1 100644
+--- a/src/cop5556sp17/AST/Expression.java
++++ b/src/cop5556sp17/AST/Expression.java
+@@ -6,6 +6,7 @@ import cop5556sp17.AST.Type.TypeName;
+ public abstract class Expression extends ASTNode {
+ 	
+ 	private TypeName type;
++	private Dec dec;
+ 	protected Expression(Token firstToken) {
+ 		super(firstToken);
+ 	}
+@@ -17,4 +18,15 @@ public abstract class Expression extends ASTNode {
+ 		return type;
+ 	}
+ 
++	public void setType(TypeName t){
++		type = t;
++	}
++	
++	public void setDec(Dec d){
++		dec = d;
++	}
++	
++	public Dec getDec(){
++		return dec;
++	}
+ }
+diff --git a/src/cop5556sp17/AST/IdentLValue.java b/src/cop5556sp17/AST/IdentLValue.java
+index fb0adc7..865bea0 100644
+--- a/src/cop5556sp17/AST/IdentLValue.java
++++ b/src/cop5556sp17/AST/IdentLValue.java
+@@ -1,6 +1,8 @@
+ package cop5556sp17.AST;
+ 
++import cop5556sp17.Parser.SyntaxException;
+ import cop5556sp17.Scanner.Token;
++import cop5556sp17.AST.Type.TypeName;
+ 
+ public class IdentLValue extends ASTNode {
+ 	
+@@ -30,5 +32,9 @@ public class IdentLValue extends ASTNode {
+ 	public Dec getDec() {
+ 		return dec;
+ 	}
++	
++	public TypeName getType() throws SyntaxException{
++		return dec.getType();
++	}
+ 
+ }
+diff --git a/src/cop5556sp17/SymbolTable.java b/src/cop5556sp17/SymbolTable.java
+index 9e29053..4b81d1d 100644
+--- a/src/cop5556sp17/SymbolTable.java
++++ b/src/cop5556sp17/SymbolTable.java
+@@ -32,6 +32,7 @@ public class SymbolTable {
+ 	public void enterScope(){
+ 		//TODO:  IMPLEMENT THIS
+ 		stack.add(new Integer(next_scope));
++		current_scope = next_scope;
+ 		next_scope++;
+ 	}
+ 	
+@@ -49,11 +50,10 @@ public class SymbolTable {
+ 		//TODO:  IMPLEMENT THIS
+ 		ArrayList<hashValue> arr = table.get(ident);
+ 		if (arr == null){
+-			
+-		}
+-		else{
+-			arr.add(new hashValue(current_scope, dec));
++			arr = new ArrayList<hashValue>();
++			table.put(ident, arr);
+ 		}
++		arr.add(new hashValue(current_scope, dec));
+ 		return true;
+ 	}
+ 	
+@@ -73,7 +73,9 @@ public class SymbolTable {
+ 	public SymbolTable() {
+ 		//TODO:  IMPLEMENT THIS
+ 		stack = new ArrayList<Integer>();
+-		next_scope = 0;
++		table = new HashMap<>();
++		stack.add(0);
++		next_scope = 1;
+ 		current_scope = 0;
+ 	}
+ 
+diff --git a/src/cop5556sp17/TypeCheckVisitor.java b/src/cop5556sp17/TypeCheckVisitor.java
+index d182ada..dfc1d92 100644
+--- a/src/cop5556sp17/TypeCheckVisitor.java
++++ b/src/cop5556sp17/TypeCheckVisitor.java
+@@ -1,14 +1,11 @@
+ package cop5556sp17;
+ 
+ import java.util.ArrayList;
+-
+-import com.sun.xml.internal.bind.v2.model.core.ID;
++import java.util.List;
+ 
+ import cop5556sp17.AST.*;
+ import cop5556sp17.AST.Type.TypeName;
+ 
+-import cop5556sp17.Scanner.Kind;
+-import cop5556sp17.Scanner.LinePos;
+ import cop5556sp17.Scanner.Token;
+ import static cop5556sp17.AST.Type.TypeName.*;
+ import static cop5556sp17.Scanner.Kind.*;
+@@ -26,7 +23,7 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 
+ 	@Override
+ 	public Object visitBinaryChain(BinaryChain binaryChain, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
+ 		Token first = binaryChain.getFirstToken();
+ 		Chain ch = binaryChain.getE0();
+ 		ch.visit(this, arg);
+@@ -53,7 +50,7 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 			else if (ch.getType().equals(IMAGE) &&
+ 					first.isAmongKind(OP_WIDTH, OP_HEIGHT) &&
+ 					ce.getFirstToken().isAmongKind(OP_WIDTH, OP_HEIGHT, KW_SCALE)){
+-						binaryChain.setType(IMAGE);
++						binaryChain.setType(INTEGER);
+ 					}
+ 			else if (ch.getType().equals(IMAGE) &&
+ 					ce.getType().equals(FRAME)){
+@@ -96,22 +93,91 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 
+ 	@Override
+ 	public Object visitBinaryExpression(BinaryExpression binaryExpression, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
++		Expression e1, e2;
++		e1 = binaryExpression.getE0();
++		e2 = binaryExpression.getE1();
++		Token op = binaryExpression.getOp();
++		switch (op.kind) {
++		case PLUS:
++		case MINUS:
++			if (e1.getType().equals(INTEGER) && e2.getType().equals(INTEGER))
++				binaryExpression.setType(INTEGER);
++			else if (e1.getType().equals(IMAGE) && e2.getType().equals(IMAGE))
++				binaryExpression.setType(IMAGE);
++			else {
++				throw new TypeCheckException("Error");
++			}
++		break;
++		
++		case TIMES:
++			if (e1.getType().equals(INTEGER) && e2.getType().equals(INTEGER))
++				binaryExpression.setType(INTEGER);
++			else if (e1.getType().equals(INTEGER) && e2.getType().equals(IMAGE))
++				binaryExpression.setType(IMAGE);
++			else if (e1.getType().equals(IMAGE) && e2.getType().equals(INTEGER))
++				binaryExpression.setType(IMAGE);
++			else
++				throw new TypeCheckException("Error");
++		break;
++		
++		case DIV:
++			if (e1.getType().equals(INTEGER) && e2.getType().equals(INTEGER))
++				binaryExpression.setType(INTEGER);
++			else
++				throw new TypeCheckException("Error");
++		break;
++		
++		case LT:
++		case GT:
++		case LE:
++		case GE:
++			if (e1.getType().equals(INTEGER) && e2.getType().equals(INTEGER))
++				binaryExpression.setType(BOOLEAN);
++			if (e1.getType().equals(BOOLEAN) && e2.getType().equals(BOOLEAN))
++				binaryExpression.setType(BOOLEAN);
++			else
++				throw new TypeCheckException("Error");
++		break;
++		
++		case EQUAL:
++		case NOTEQUAL:
++			if (e1.getType().equals(e2.getType()))
++				binaryExpression.setType(BOOLEAN);
++			else
++				throw new TypeCheckException("Error");
++		break;
++		default:
++			throw new TypeCheckException("Error");
++		}
+ 		return null;
+ 	}
+ 
+ 	@Override
+ 	public Object visitBlock(Block block, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
+ 		symtab.enterScope();
++		int i,j;
+ 		ArrayList<Dec> dec = block.getDecs();
+ 		ArrayList<Statement>st = block.getStatements();
+-		for (int i=0; i<dec.size(); i++){
++		for (i=0, j=0; i<dec.size() && j<st.size();){
++			
++			if (dec.get(i).firstToken.pos < st.get(j).firstToken.pos){
++				dec.get(i).visit(this, arg);
++				i++;
++			}
++			else{
++				st.get(j).visit(this, arg);
++				j++;
++			}
++		}
++		
++		for (; i<dec.size(); i++){
+ 			dec.get(i).visit(this, arg);
+ 		}
+ 		
+-		for (int i=0; i<st.size(); i++){
+-			st.get(i).visit(this, arg);
++		for (; j<st.size(); j++){
++			st.get(j).visit(this, arg);
+ 		}
+ 		symtab.leaveScope();
+ 		return null;
+@@ -119,13 +185,14 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 
+ 	@Override
+ 	public Object visitBooleanLitExpression(BooleanLitExpression booleanLitExpression, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
++		booleanLitExpression.setType(BOOLEAN);
+ 		return null;
+ 	}
+ 
+ 	@Override
+ 	public Object visitFilterOpChain(FilterOpChain filterOpChain, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
+ 		if (filterOpChain.getArg().getExprList().size() != 0){
+ 			throw new TypeCheckException("Error");
+ 		}
+@@ -135,7 +202,7 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 
+ 	@Override
+ 	public Object visitFrameOpChain(FrameOpChain frameOpChain, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
+ 		Token t = frameOpChain.firstToken;
+ 		Tuple tp = frameOpChain.getArg();
+ 		frameOpChain.setType(Type.getTypeName(t));
+@@ -165,20 +232,32 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 
+ 	@Override
+ 	public Object visitIdentChain(IdentChain identChain, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
+-		//identChain.setType(); 
++		// Implemented this
++		//identChain.setType();
++		Token first = identChain.getFirstToken();
++		Dec d = symtab.lookup(first.getText());
++		if (d == null){
++			throw new TypeCheckException("Error");
++		}
++		identChain.setType(d.getType());
+ 		return null;
+ 	}
+ 
+ 	@Override
+ 	public Object visitIdentExpression(IdentExpression identExpression, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
++		Dec d = symtab.lookup(identExpression.getFirstToken().getText());
++		if (d == null){
++			throw new TypeCheckException("Error");
++		}
++		identExpression.setType( d.getType() );
++		identExpression.setDec(d);
+ 		return null;
+ 	}
+ 
+ 	@Override
+ 	public Object visitIfStatement(IfStatement ifStatement, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
+ 		Expression e = ifStatement.getE();
+ 		e.visit(this, arg);
+ 		if (!e.getType().equals( TypeName.BOOLEAN ) ){
+@@ -191,13 +270,14 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 
+ 	@Override
+ 	public Object visitIntLitExpression(IntLitExpression intLitExpression, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
++		intLitExpression.setType(INTEGER);
+ 		return null;
+ 	}
+ 
+ 	@Override
+ 	public Object visitSleepStatement(SleepStatement sleepStatement, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
+ 		Expression e = sleepStatement.getE();
+ 		e.visit(this, arg);
+ 		if (!( e.getType().equals( TypeName.INTEGER) ) ){
+@@ -208,7 +288,7 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 
+ 	@Override
+ 	public Object visitWhileStatement(WhileStatement whileStatement, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
+ 		Expression e = whileStatement.getE();
+ 		e.visit(this, arg);
+ 		if (! (e.getType().equals( TypeName.BOOLEAN ) ) ){
+@@ -221,14 +301,14 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 
+ 	@Override
+ 	public Object visitDec(Dec declaration, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
+ 		symtab.insert(declaration.getIdent().getText(), declaration);
+ 		return null;
+ 	}
+ 
+ 	@Override
+ 	public Object visitProgram(Program program, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
+ 		ArrayList<ParamDec> arr = program.getParams();
+ 		for (int i=0; i<arr.size(); i++){
+ 			arr.get(i).visit(this, arg);
+@@ -240,12 +320,12 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 
+ 	@Override
+ 	public Object visitAssignmentStatement(AssignmentStatement assignStatement, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
+ 		IdentLValue id = assignStatement.getVar();
+ 		id.visit(this, arg);
+ 		Expression e = assignStatement.getE();
+ 		e.visit(this, arg);
+-		if ( !(e.getType().equals( Type.getTypeName(id.getFirstToken()) ) ) ){
++		if ( !(e.getType().equals( id.getType())) ){
+ 			throw new TypeCheckException("Error");
+ 		}
+ 		return null;
+@@ -253,7 +333,7 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 
+ 	@Override
+ 	public Object visitIdentLValue(IdentLValue identX, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
+ 		Dec d = symtab.lookup(identX.getText());
+ 		if (d == null)
+ 			throw new TypeCheckException("Error");
+@@ -265,20 +345,21 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 
+ 	@Override
+ 	public Object visitParamDec(ParamDec paramDec, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
+ 		symtab.insert(paramDec.getIdent().getText(), paramDec);
+ 		return null;
+ 	}
+ 
+ 	@Override
+ 	public Object visitConstantExpression(ConstantExpression constantExpression, Object arg) {
+-		// TODO Auto-generated method stub
++		// Implemented this
++		constantExpression.setType(INTEGER);
+ 		return null;
+ 	}
+ 
+ 	@Override
+ 	public Object visitImageOpChain(ImageOpChain imageOpChain, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
+ 		Token t = imageOpChain.firstToken;
+ 		Tuple tp = imageOpChain.getArg();
+ 		imageOpChain.setType(Type.getTypeName(t));
+@@ -299,7 +380,11 @@ public class TypeCheckVisitor implements ASTVisitor {
+ 
+ 	@Override
+ 	public Object visitTuple(Tuple tuple, Object arg) throws Exception {
+-		// TODO Auto-generated method stub
++		// Implemented this
++		List<Expression> e = tuple.getExprList();
++		for (int i=0;i<e.size();i++){
++			e.get(i).visit(this, arg);
++		}
+ 		return null;
+ 	}
+ }
+\ No newline at end of file
+-- 
+1.9.1
+

@@ -1,0 +1,631 @@
+From 80bdf819eef113c159578c68daf51cc798d153b3 Mon Sep 17 00:00:00 2001
+From: Abhinav-Reddy <abhinavpodduturi@ufl.edu>
+Date: Wed, 8 Mar 2017 20:56:41 -0500
+Subject: [PATCH] Partial changes for Tree traversal
+
+---
+ src/cop5556sp17/AST/Chain.java            |  11 ++
+ src/cop5556sp17/AST/ChainElem.java        |   2 -
+ src/cop5556sp17/AST/Expression.java       |   6 +
+ src/cop5556sp17/AST/IdentLValue.java      |   9 +
+ src/cop5556sp17/AST/Type.java             |  38 ++++
+ src/cop5556sp17/SymbolTable.java          |  90 +++++++++
+ src/cop5556sp17/TypeCheckVisitor.java     | 305 ++++++++++++++++++++++++++++++
+ src/cop5556sp17/TypeCheckVisitorTest.java |  59 ++++++
+ 8 files changed, 518 insertions(+), 2 deletions(-)
+ create mode 100644 src/cop5556sp17/AST/Type.java
+ create mode 100644 src/cop5556sp17/SymbolTable.java
+ create mode 100644 src/cop5556sp17/TypeCheckVisitor.java
+ create mode 100644 src/cop5556sp17/TypeCheckVisitorTest.java
+
+diff --git a/src/cop5556sp17/AST/Chain.java b/src/cop5556sp17/AST/Chain.java
+index 322a571..4865dd4 100644
+--- a/src/cop5556sp17/AST/Chain.java
++++ b/src/cop5556sp17/AST/Chain.java
+@@ -1,12 +1,23 @@
+ package cop5556sp17.AST;
+ 
++import cop5556sp17.AST.Type.TypeName;
+ import cop5556sp17.Scanner.Token;
+ 
+ 
+ public abstract class Chain extends Statement {
+ 	
++	private TypeName type;
+ 	public Chain(Token firstToken) {
+ 		super(firstToken);
++		type = null;
++	}
++	
++	public void setType(TypeName t){
++		type = t;
++	}
++	
++	public TypeName getType(){
++		return type;
+ 	}
+ 
+ }
+diff --git a/src/cop5556sp17/AST/ChainElem.java b/src/cop5556sp17/AST/ChainElem.java
+index f4d0250..5ae74e4 100644
+--- a/src/cop5556sp17/AST/ChainElem.java
++++ b/src/cop5556sp17/AST/ChainElem.java
+@@ -8,6 +8,4 @@ public abstract class ChainElem extends Chain {
+ 		super(firstToken);
+ 	}
+ 
+-
+-
+ }
+diff --git a/src/cop5556sp17/AST/Expression.java b/src/cop5556sp17/AST/Expression.java
+index 4eb2653..07f337a 100644
+--- a/src/cop5556sp17/AST/Expression.java
++++ b/src/cop5556sp17/AST/Expression.java
+@@ -1,14 +1,20 @@
+ package cop5556sp17.AST;
+ 
+ import cop5556sp17.Scanner.Token;
++import cop5556sp17.AST.Type.TypeName;
+ 
+ public abstract class Expression extends ASTNode {
+ 	
++	private TypeName type;
+ 	protected Expression(Token firstToken) {
+ 		super(firstToken);
+ 	}
+ 
+ 	@Override
+ 	abstract public Object visit(ASTVisitor v, Object arg) throws Exception;
++	
++	public TypeName getType(){
++		return type;
++	}
+ 
+ }
+diff --git a/src/cop5556sp17/AST/IdentLValue.java b/src/cop5556sp17/AST/IdentLValue.java
+index 239a047..fb0adc7 100644
+--- a/src/cop5556sp17/AST/IdentLValue.java
++++ b/src/cop5556sp17/AST/IdentLValue.java
+@@ -4,6 +4,7 @@ import cop5556sp17.Scanner.Token;
+ 
+ public class IdentLValue extends ASTNode {
+ 	
++	Dec dec;
+ 	public IdentLValue(Token firstToken) {
+ 		super(firstToken);
+ 	}
+@@ -21,5 +22,13 @@ public class IdentLValue extends ASTNode {
+ 	public String getText() {
+ 		return firstToken.getText();
+ 	}
++	
++	public void setDec(Dec d) {
++		dec = d;
++	}
++	
++	public Dec getDec() {
++		return dec;
++	}
+ 
+ }
+diff --git a/src/cop5556sp17/AST/Type.java b/src/cop5556sp17/AST/Type.java
+new file mode 100644
+index 0000000..c15c7bb
+--- /dev/null
++++ b/src/cop5556sp17/AST/Type.java
+@@ -0,0 +1,38 @@
++package cop5556sp17.AST;
++
++import cop5556sp17.Parser;
++import cop5556sp17.Parser.SyntaxException;
++import cop5556sp17.Scanner.Token;
++
++public class Type  {
++	
++
++	public static TypeName getTypeName(Token token) throws SyntaxException{
++		switch (token.kind){
++		case KW_INTEGER: {return TypeName.INTEGER;} 
++		case KW_BOOLEAN: {return TypeName.BOOLEAN;} 
++		case KW_IMAGE: {return TypeName.IMAGE;} 
++		case KW_FRAME: {return TypeName.FRAME;} 
++		case KW_URL: {return TypeName.URL;} 
++		case KW_FILE: {return TypeName.FILE;} 
++		default: throw new Parser.SyntaxException("illegal type");
++		}		
++	}
++
++	public static enum TypeName {
++		INTEGER, 
++		BOOLEAN, 
++		IMAGE, 
++		FRAME,
++	    URL, 
++	    FILE, 
++	    NONE;
++		
++		public boolean isType(TypeName... types){
++			for (TypeName type: types){
++				if (type.equals(this)) return true;
++			}
++			return false;
++		}
++}
++}
+diff --git a/src/cop5556sp17/SymbolTable.java b/src/cop5556sp17/SymbolTable.java
+new file mode 100644
+index 0000000..9e29053
+--- /dev/null
++++ b/src/cop5556sp17/SymbolTable.java
+@@ -0,0 +1,90 @@
++package cop5556sp17;
++
++import java.util.*;
++import cop5556sp17.AST.Dec;
++
++
++public class SymbolTable {
++	
++	class hashValue{
++		public
++			int scope;
++			Dec dec;
++			public hashValue() {
++				scope = 0;
++				dec = null;
++			}
++			
++			public hashValue(int s, Dec d){
++				scope = s;
++				dec = d;
++			}
++			
++	}
++	
++	//TODO  add fields
++	ArrayList<Integer> stack;
++	int next_scope, current_scope;
++	HashMap< String, ArrayList<hashValue> >table;
++	/** 
++	 * to be called when block entered
++	 */
++	public void enterScope(){
++		//TODO:  IMPLEMENT THIS
++		stack.add(new Integer(next_scope));
++		next_scope++;
++	}
++	
++	
++	/**
++	 * leaves scope
++	 */
++	public void leaveScope(){
++		//TODO:  IMPLEMENT THIS
++		stack.remove(stack.size()-1);
++		current_scope = stack.get(stack.size()-1);
++	}
++	
++	public boolean insert(String ident, Dec dec){
++		//TODO:  IMPLEMENT THIS
++		ArrayList<hashValue> arr = table.get(ident);
++		if (arr == null){
++			
++		}
++		else{
++			arr.add(new hashValue(current_scope, dec));
++		}
++		return true;
++	}
++	
++	public Dec lookup(String ident){
++		//TODO:  IMPLEMENT THIS
++		ArrayList<hashValue> arr = table.get(ident);
++		for(int j=stack.size() - 1; j >=0; j--){
++			for(int i=0; i<arr.size(); i++){
++				if (stack.get(j) == arr.get(i).scope){
++					return arr.get(i).dec;
++				}
++			}
++		}
++		return null;
++	}
++		
++	public SymbolTable() {
++		//TODO:  IMPLEMENT THIS
++		stack = new ArrayList<Integer>();
++		next_scope = 0;
++		current_scope = 0;
++	}
++
++
++	@Override
++	public String toString() {
++		//TODO:  IMPLEMENT THIS
++		return "";
++	}
++	
++	
++
++
++}
+\ No newline at end of file
+diff --git a/src/cop5556sp17/TypeCheckVisitor.java b/src/cop5556sp17/TypeCheckVisitor.java
+new file mode 100644
+index 0000000..d182ada
+--- /dev/null
++++ b/src/cop5556sp17/TypeCheckVisitor.java
+@@ -0,0 +1,305 @@
++package cop5556sp17;
++
++import java.util.ArrayList;
++
++import com.sun.xml.internal.bind.v2.model.core.ID;
++
++import cop5556sp17.AST.*;
++import cop5556sp17.AST.Type.TypeName;
++
++import cop5556sp17.Scanner.Kind;
++import cop5556sp17.Scanner.LinePos;
++import cop5556sp17.Scanner.Token;
++import static cop5556sp17.AST.Type.TypeName.*;
++import static cop5556sp17.Scanner.Kind.*;
++
++public class TypeCheckVisitor implements ASTVisitor {
++
++	@SuppressWarnings("serial")
++	public static class TypeCheckException extends Exception {
++		TypeCheckException(String message) {
++			super(message);
++		}
++	}
++
++	SymbolTable symtab = new SymbolTable();
++
++	@Override
++	public Object visitBinaryChain(BinaryChain binaryChain, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		Token first = binaryChain.getFirstToken();
++		Chain ch = binaryChain.getE0();
++		ch.visit(this, arg);
++		ChainElem ce = binaryChain.getE1();
++		ce.visit(this, arg);
++		Token t = binaryChain.getArrow();
++		if (t.isKind(ARROW)){
++			if (ch.getType().equals(URL) && ce.getType().equals(IMAGE)){
++				binaryChain.setType(IMAGE);
++			}
++			else if (ch.getType().equals(FILE) && ce.getType().equals(IMAGE)){
++				binaryChain.setType(IMAGE);
++			}
++			else if (ch.getType().equals(FRAME) && 
++					first.isAmongKind(KW_XLOC, KW_YLOC) &&
++					ce.getFirstToken().isAmongKind(KW_SHOW, KW_HIDE, KW_MOVE, KW_XLOC, KW_YLOC)){
++				binaryChain.setType(INTEGER);
++			}
++			else if (ch.getType().equals(FRAME) && 
++					first.isAmongKind(KW_SHOW, KW_HIDE, KW_MOVE) &&
++					ce.getFirstToken().isAmongKind(KW_SHOW, KW_HIDE, KW_MOVE, KW_XLOC, KW_YLOC)){
++				binaryChain.setType(FRAME);
++			}
++			else if (ch.getType().equals(IMAGE) &&
++					first.isAmongKind(OP_WIDTH, OP_HEIGHT) &&
++					ce.getFirstToken().isAmongKind(OP_WIDTH, OP_HEIGHT, KW_SCALE)){
++						binaryChain.setType(IMAGE);
++					}
++			else if (ch.getType().equals(IMAGE) &&
++					ce.getType().equals(FRAME)){
++						binaryChain.setType(FRAME);
++					}
++			else if (ch.getType().equals(IMAGE) &&
++					ce.getType().equals(FILE)){
++						binaryChain.setType(NONE);
++					}
++			else if (ch.getType().equals(TypeName.IMAGE) &&
++					first.isAmongKind(OP_GRAY, OP_BLUR, OP_CONVOLVE) &&
++					ce.getFirstToken().isAmongKind(OP_WIDTH, OP_HEIGHT, KW_SCALE)){
++						binaryChain.setType(IMAGE);
++					}
++			else if (ch.getType().equals(TypeName.IMAGE) &&
++					first.isKind(KW_SCALE) &&
++					ce.getFirstToken().isAmongKind(OP_WIDTH, OP_HEIGHT, KW_SCALE)){
++						binaryChain.setType(IMAGE);
++					}
++			else if (ch.getType().equals(TypeName.IMAGE) &&
++					ce.getFirstToken().isKind(IDENT)){
++						binaryChain.setType(IMAGE);
++					}
++		}
++		else if(t.isKind(BARARROW)){
++			if (ch.getType().equals(TypeName.IMAGE) &&
++				first.isAmongKind(OP_GRAY, OP_BLUR, OP_CONVOLVE) &&
++				ce.getFirstToken().isAmongKind(OP_WIDTH, OP_HEIGHT, KW_SCALE)){
++				binaryChain.setType(IMAGE);
++			}
++			else{
++				throw new TypeCheckException("Error");
++			}
++		}
++		else{
++			throw new TypeCheckException("Error");
++		}
++		return null;
++	}
++
++	@Override
++	public Object visitBinaryExpression(BinaryExpression binaryExpression, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		return null;
++	}
++
++	@Override
++	public Object visitBlock(Block block, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		symtab.enterScope();
++		ArrayList<Dec> dec = block.getDecs();
++		ArrayList<Statement>st = block.getStatements();
++		for (int i=0; i<dec.size(); i++){
++			dec.get(i).visit(this, arg);
++		}
++		
++		for (int i=0; i<st.size(); i++){
++			st.get(i).visit(this, arg);
++		}
++		symtab.leaveScope();
++		return null;
++	}
++
++	@Override
++	public Object visitBooleanLitExpression(BooleanLitExpression booleanLitExpression, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		return null;
++	}
++
++	@Override
++	public Object visitFilterOpChain(FilterOpChain filterOpChain, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		if (filterOpChain.getArg().getExprList().size() != 0){
++			throw new TypeCheckException("Error");
++		}
++		filterOpChain.setType(TypeName.IMAGE);
++		return null;
++	}
++
++	@Override
++	public Object visitFrameOpChain(FrameOpChain frameOpChain, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		Token t = frameOpChain.firstToken;
++		Tuple tp = frameOpChain.getArg();
++		frameOpChain.setType(Type.getTypeName(t));
++		if (t.isAmongKind(KW_SHOW, KW_HIDE)){
++			if (tp.getExprList().size() != 0){
++				throw new TypeCheckException("Error");
++			}
++			frameOpChain.setType(NONE);
++		}
++		else if (t.isAmongKind(KW_XLOC, KW_YLOC)){
++			if (tp.getExprList().size() != 0){
++				throw new TypeCheckException("Error");
++			}
++			frameOpChain.setType(TypeName.INTEGER);
++		}
++		else if(t.isKind(KW_MOVE)){
++			if (tp.getExprList().size() != 2){
++				throw new TypeCheckException("Error");
++			}
++			frameOpChain.setType(NONE);
++		}
++		else{
++			throw new TypeCheckException("Error");
++		}
++		return null;
++	}
++
++	@Override
++	public Object visitIdentChain(IdentChain identChain, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		//identChain.setType(); 
++		return null;
++	}
++
++	@Override
++	public Object visitIdentExpression(IdentExpression identExpression, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		return null;
++	}
++
++	@Override
++	public Object visitIfStatement(IfStatement ifStatement, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		Expression e = ifStatement.getE();
++		e.visit(this, arg);
++		if (!e.getType().equals( TypeName.BOOLEAN ) ){
++			throw new TypeCheckException("Error");
++		}
++		Block b = ifStatement.getB();
++		b.visit(this, arg);
++		return null;
++	}
++
++	@Override
++	public Object visitIntLitExpression(IntLitExpression intLitExpression, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		return null;
++	}
++
++	@Override
++	public Object visitSleepStatement(SleepStatement sleepStatement, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		Expression e = sleepStatement.getE();
++		e.visit(this, arg);
++		if (!( e.getType().equals( TypeName.INTEGER) ) ){
++			throw new TypeCheckException("Error");
++		}
++		return null;
++	}
++
++	@Override
++	public Object visitWhileStatement(WhileStatement whileStatement, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		Expression e = whileStatement.getE();
++		e.visit(this, arg);
++		if (! (e.getType().equals( TypeName.BOOLEAN ) ) ){
++			throw new TypeCheckException("Error");
++		}
++		Block b = whileStatement.getB();
++		b.visit(this, arg);
++		return null;
++	}
++
++	@Override
++	public Object visitDec(Dec declaration, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		symtab.insert(declaration.getIdent().getText(), declaration);
++		return null;
++	}
++
++	@Override
++	public Object visitProgram(Program program, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		ArrayList<ParamDec> arr = program.getParams();
++		for (int i=0; i<arr.size(); i++){
++			arr.get(i).visit(this, arg);
++		}
++		Block b = program.getB();
++		b.visit(this, arg);
++		return null;
++	}
++
++	@Override
++	public Object visitAssignmentStatement(AssignmentStatement assignStatement, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		IdentLValue id = assignStatement.getVar();
++		id.visit(this, arg);
++		Expression e = assignStatement.getE();
++		e.visit(this, arg);
++		if ( !(e.getType().equals( Type.getTypeName(id.getFirstToken()) ) ) ){
++			throw new TypeCheckException("Error");
++		}
++		return null;
++	}
++
++	@Override
++	public Object visitIdentLValue(IdentLValue identX, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		Dec d = symtab.lookup(identX.getText());
++		if (d == null)
++			throw new TypeCheckException("Error");
++		else {
++			identX.setDec(d);
++		}
++		return null;
++	}
++
++	@Override
++	public Object visitParamDec(ParamDec paramDec, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		symtab.insert(paramDec.getIdent().getText(), paramDec);
++		return null;
++	}
++
++	@Override
++	public Object visitConstantExpression(ConstantExpression constantExpression, Object arg) {
++		// TODO Auto-generated method stub
++		return null;
++	}
++
++	@Override
++	public Object visitImageOpChain(ImageOpChain imageOpChain, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		Token t = imageOpChain.firstToken;
++		Tuple tp = imageOpChain.getArg();
++		imageOpChain.setType(Type.getTypeName(t));
++		if (t.isAmongKind(OP_WIDTH, OP_HEIGHT)){
++			if (tp.getExprList().size() != 0){
++				throw new TypeCheckException("Error");
++			}
++			imageOpChain.setType(TypeName.INTEGER);
++		}
++		else if (t.isKind(KW_SCALE)){
++			if (tp.getExprList().size() != 1){
++				throw new TypeCheckException("Error");
++			}
++			imageOpChain.setType(TypeName.IMAGE);
++		}
++		return null;
++	}
++
++	@Override
++	public Object visitTuple(Tuple tuple, Object arg) throws Exception {
++		// TODO Auto-generated method stub
++		return null;
++	}
++}
+\ No newline at end of file
+diff --git a/src/cop5556sp17/TypeCheckVisitorTest.java b/src/cop5556sp17/TypeCheckVisitorTest.java
+new file mode 100644
+index 0000000..b7a2248
+--- /dev/null
++++ b/src/cop5556sp17/TypeCheckVisitorTest.java
+@@ -0,0 +1,59 @@
++/**  Important to test the error cases in case the
++ * AST is not being completely traversed.
++ * 
++ * Only need to test syntactically correct programs, or
++ * program fragments.
++ */
++
++package cop5556sp17;
++
++import static org.junit.Assert.*;
++
++import org.junit.Before;
++import org.junit.BeforeClass;
++import org.junit.Rule;
++import org.junit.Test;
++import org.junit.rules.ExpectedException;
++
++import cop5556sp17.AST.ASTNode;
++import cop5556sp17.AST.Dec;
++import cop5556sp17.AST.IdentExpression;
++import cop5556sp17.AST.Program;
++import cop5556sp17.AST.Statement;
++import cop5556sp17.Parser.SyntaxException;
++import cop5556sp17.Scanner.IllegalCharException;
++import cop5556sp17.Scanner.IllegalNumberException;
++import cop5556sp17.TypeCheckVisitor.TypeCheckException;
++
++public class TypeCheckVisitorTest {
++	
++
++	@Rule
++	public ExpectedException thrown = ExpectedException.none();
++
++	@Test
++	public void testAssignmentBoolLit0() throws Exception{
++		String input = "p {\nboolean y \ny <- false;}";
++		Scanner scanner = new Scanner(input);
++		scanner.scan();
++		Parser parser = new Parser(scanner);
++		ASTNode program = parser.parse();
++		TypeCheckVisitor v = new TypeCheckVisitor();
++		program.visit(v, null);		
++	}
++
++	@Test
++	public void testAssignmentBoolLitError0() throws Exception{
++		String input = "p {\nboolean y \ny <- 3;}";
++		Scanner scanner = new Scanner(input);
++		scanner.scan();
++		Parser parser = new Parser(scanner);
++		ASTNode program = parser.parse();
++		TypeCheckVisitor v = new TypeCheckVisitor();
++		thrown.expect(TypeCheckVisitor.TypeCheckException.class);
++		program.visit(v, null);		
++	}		
++
++
++
++}
+-- 
+1.9.1
+
