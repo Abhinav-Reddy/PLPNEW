@@ -167,10 +167,10 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 		program.getB().visit(this, 1);
 		mv.visitMaxs(1, 1);
 		mv.visitEnd(); // end of run method
-		
-		
+
+
 		cw.visitEnd();//end of class
-		
+
 		//generate classfile and return it
 		return cw.toByteArray();
 	}
@@ -295,7 +295,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 		Label startLabel = new Label();
 		mv.visitLabel(startLabel);
 		for (i=0, j=0; i<dec.size() && j<st.size();){
-			
+
 			if (dec.get(i).firstToken.pos < st.get(j).firstToken.pos){
 				dec.get(i).visit(this, slotNo);
 				i++;
@@ -306,22 +306,22 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 				j++;
 			}
 		}
-		
+
 		for (; i<dec.size(); i++){
 			dec.get(i).visit(this, slotNo);
 			slotNo++;
 		}
-		
+
 		for (; j<st.size(); j++){
 			st.get(j).visit(this, slotNo);
 		}
 		Label endLabel = new Label();
 		mv.visitLabel(endLabel);
-		
+
 		for(i=0;i<dec.size();i++){
 			mv.visitLocalVariable(dec.get(i).getIdent().toString(), dec.get(i).getType().getJVMTypeDesc(), null, startLabel, endLabel, dec.get(i).getSlot());
 		}
-		
+
 		return null;
 	}
 
@@ -344,7 +344,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 	@Override
 	public Object visitDec(Dec declaration, Object arg) throws Exception {
 		//TODO Implement this
-		
+
 		declaration.setSlot((int)arg);
 		return null;
 	}
@@ -371,7 +371,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 	public Object visitIdentExpression(IdentExpression identExpression, Object arg) throws Exception {
 		//TODO Implement this
 		if (identExpression.getDec() instanceof ParamDec){
-			mv.visitFieldInsn(PUTFIELD, className, identExpression.getFirstToken().getText(), identExpression.getType().getJVMTypeDesc());
+			mv.visitFieldInsn(GETFIELD, className, identExpression.getFirstToken().getText(), identExpression.getType().getJVMTypeDesc());
 		}
 		else{
 			mv.visitVarInsn(ILOAD, identExpression.getDec().getSlot());
@@ -383,7 +383,9 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 	public Object visitIdentLValue(IdentLValue identX, Object arg) throws Exception {
 		//TODO Implement this
 		if (identX.getDec() instanceof ParamDec){
-			mv.visitFieldInsn(GETFIELD, className, identX.getText(), identX.getType().getJVMTypeDesc());
+			mv.visitIntInsn(ALOAD, 0);
+			mv.visitInsn(SWAP);
+			mv.visitFieldInsn(PUTFIELD, className, identX.getFirstToken().getText(), identX.getType().getJVMTypeDesc());
 		}
 		else{
 			mv.visitVarInsn(ISTORE, identX.getDec().getSlot());
@@ -422,16 +424,9 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 		//TODO Implement this
 		//For assignment 5, only needs to handle integers and booleans
 		if (paramDec.getType().equals(INTEGER)){
-			mv.visitIntInsn(BIPUSH, (int)arg);
 			mv.visitFieldInsn(PUTFIELD, className, paramDec.firstToken.getText(), paramDec.getType().getJVMTypeDesc());
 		}
 		else if(paramDec.getType().equals(TypeName.INTEGER)){
-			if ((boolean)arg == true){
-				mv.visitInsn(ICONST_1);
-			}
-			else{
-				mv.visitInsn(ICONST_0);
-			}
 			mv.visitFieldInsn(PUTFIELD, className, paramDec.firstToken.getText(), paramDec.getType().getJVMTypeDesc());
 		}
 		return null;
