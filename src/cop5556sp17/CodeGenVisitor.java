@@ -164,6 +164,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 		mv.visitLabel(endRun);
 		mv.visitLocalVariable("this", classDesc, null, startRun, endRun, 0);
 //TODO  visit the local variables
+		program.getB().visit(this, 1);
 		mv.visitMaxs(1, 1);
 		mv.visitEnd(); // end of run method
 		
@@ -200,23 +201,61 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 		Token token = binaryExpression.getOp();
 		e0.visit(this, arg);
 		e1.visit(this, arg);
+		Label l1 = new Label();
+		Label l3 = new Label();
 		switch(token.kind){
 		case LT:
+			mv.visitJumpInsn(IF_ICMPLT, l1);
+			mv.visitInsn(ICONST_0);
+			mv.visitJumpInsn(GOTO, l3);
+			mv.visitLabel(l1);
+			mv.visitInsn(ICONST_1);
+			mv.visitLabel(l3);
 			//mv.visitInsn();
 			break;
 		case LE:
+			mv.visitJumpInsn(IF_ICMPLE, l1);
+			mv.visitInsn(ICONST_0);
+			mv.visitJumpInsn(GOTO, l3);
+			mv.visitLabel(l1);
+			mv.visitInsn(ICONST_1);
+			mv.visitLabel(l3);
 			//mv.visitInsn();
 			break;
 		case GT:
 			//mv.visitInsn();
+			mv.visitJumpInsn(IF_ICMPGT, l1);
+			mv.visitInsn(ICONST_0);
+			mv.visitJumpInsn(GOTO, l3);
+			mv.visitLabel(l1);
+			mv.visitInsn(ICONST_1);
+			mv.visitLabel(l3);
 			break;
 		case GE:
+			mv.visitJumpInsn(IF_ICMPGE, l1);
+			mv.visitInsn(ICONST_0);
+			mv.visitJumpInsn(GOTO, l3);
+			mv.visitLabel(l1);
+			mv.visitInsn(ICONST_1);
+			mv.visitLabel(l3);
 			//mv.visitInsn();
 			break;
 		case EQUAL:
 			//mv.visitInsn();
+			mv.visitJumpInsn(IF_ICMPEQ, l1);
+			mv.visitInsn(ICONST_0);
+			mv.visitJumpInsn(GOTO, l3);
+			mv.visitLabel(l1);
+			mv.visitInsn(ICONST_1);
+			mv.visitLabel(l3);
 			break;
 		case NOTEQUAL:
+			mv.visitJumpInsn(IF_ICMPEQ, l1);
+			mv.visitInsn(ICONST_1);
+			mv.visitJumpInsn(GOTO, l3);
+			mv.visitLabel(l1);
+			mv.visitInsn(ICONST_0);
+			mv.visitLabel(l3);
 			//mv.visitInsn();
 			break;
 		case PLUS:
@@ -305,6 +344,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 	@Override
 	public Object visitDec(Dec declaration, Object arg) throws Exception {
 		//TODO Implement this
+		
 		declaration.setSlot((int)arg);
 		return null;
 	}
@@ -334,7 +374,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 			mv.visitFieldInsn(PUTFIELD, className, identExpression.getFirstToken().getText(), identExpression.getType().getJVMTypeDesc());
 		}
 		else{
-			mv.visitVarInsn(ILOAD, 1);
+			mv.visitVarInsn(ILOAD, identExpression.getDec().getSlot());
 		}
 		return null;
 	}
@@ -346,7 +386,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 			mv.visitFieldInsn(GETFIELD, className, identX.getText(), identX.getType().getJVMTypeDesc());
 		}
 		else{
-			mv.visitVarInsn(ISTORE, 1);
+			mv.visitVarInsn(ISTORE, identX.getDec().getSlot());
 		}
 		return null;
 
@@ -355,6 +395,11 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 	@Override
 	public Object visitIfStatement(IfStatement ifStatement, Object arg) throws Exception {
 		//TODO Implement this
+		Label l1 = new Label();
+		ifStatement.getE().visit(this, arg);
+		mv.visitJumpInsn(IFEQ, l1);
+		ifStatement.getB().visit(this, arg);
+		mv.visitLabel(l1);
 		return null;
 	}
 
@@ -408,6 +453,14 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 	@Override
 	public Object visitWhileStatement(WhileStatement whileStatement, Object arg) throws Exception {
 		//TODO Implement this
+		Label l1 = new Label();
+		Label l2 = new Label();
+		mv.visitJumpInsn(GOTO, l1);
+		mv.visitLabel(l2);
+		whileStatement.getB().visit(this, arg);
+		mv.visitLabel(l1);
+		whileStatement.getE().visit(this, arg);
+		mv.visitJumpInsn(IFNE, l2);
 		return null;
 	}
 
