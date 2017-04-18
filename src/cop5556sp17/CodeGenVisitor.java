@@ -72,6 +72,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 	String sourceFileName;
 
 	MethodVisitor mv; // visitor of method currently under construction
+	FieldVisitor fv;
 
 	/** Indicates whether genPrint and genPrintTOS should generate code. */
 	final boolean DEVEL;
@@ -105,8 +106,11 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 		// pass in mv so decs can add their initialization code to the
 		// constructor.
 		ArrayList<ParamDec> params = program.getParams();
-		for (ParamDec dec : params)
-			dec.visit(this, mv);
+		int idx=0;
+		for (ParamDec dec : params){
+			dec.visit(this, idx);
+			idx++;
+		}
 		mv.visitInsn(RETURN);
 		// create label at end of code
 		Label constructorEnd = new Label();
@@ -153,18 +157,19 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 		mv.visitEnd();
 
 		// create run method
+		//System.out.println("Test");
 		mv = cw.visitMethod(ACC_PUBLIC, "run", "()V", null, null);
 		mv.visitCode();
 		Label startRun = new Label();
 		mv.visitLabel(startRun);
 		CodeGenUtils.genPrint(DEVEL, mv, "\nentering run");
-		program.getB().visit(this, null);
+		program.getB().visit(this, 1);
 		mv.visitInsn(RETURN);
 		Label endRun = new Label();
 		mv.visitLabel(endRun);
 		mv.visitLocalVariable("this", classDesc, null, startRun, endRun, 0);
+
 //TODO  visit the local variables
-		program.getB().visit(this, 1);
 		mv.visitMaxs(1, 1);
 		mv.visitEnd(); // end of run method
 
@@ -182,8 +187,11 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 		assignStatement.getE().visit(this, arg);
 		CodeGenUtils.genPrint(DEVEL, mv, "\nassignment: " + assignStatement.var.getText() + "=");
 		CodeGenUtils.genPrintTOS(GRADE, mv, assignStatement.getE().getType());
+		//System.out.println("\nassignment: " + assignStatement.var.getText() + "=");
+		//System.out.println(assignStatement.getE().getType());
 		assignStatement.getVar().visit(this, arg);
 		CodeGenUtils.genPrintTOS(GRADE, mv,assignStatement.getE().getType());
+		//System.out.println(assignStatement.getE().getType());
 		return null;
 	}
 
@@ -319,7 +327,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 		mv.visitLabel(endLabel);
 
 		for(i=0;i<dec.size();i++){
-			mv.visitLocalVariable(dec.get(i).getIdent().toString(), dec.get(i).getType().getJVMTypeDesc(), null, startLabel, endLabel, dec.get(i).getSlot());
+			mv.visitLocalVariable(dec.get(i).getIdent().getText(), dec.get(i).getType().getJVMTypeDesc(), null, startLabel, endLabel, dec.get(i).getSlot());
 		}
 
 		return null;
@@ -371,6 +379,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 	public Object visitIdentExpression(IdentExpression identExpression, Object arg) throws Exception {
 		//TODO Implement this
 		if (identExpression.getDec() instanceof ParamDec){
+			mv.visitIntInsn(ALOAD, 0);
 			mv.visitFieldInsn(GETFIELD, className, identExpression.getFirstToken().getText(), identExpression.getType().getJVMTypeDesc());
 		}
 		else{
@@ -423,11 +432,24 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 	public Object visitParamDec(ParamDec paramDec, Object arg) throws Exception {
 		//TODO Implement this
 		//For assignment 5, only needs to handle integers and booleans
-		if (paramDec.getType().equals(INTEGER)){
-			mv.visitFieldInsn(PUTFIELD, className, paramDec.firstToken.getText(), paramDec.getType().getJVMTypeDesc());
+
+		if (paramDec.getType().getJVMTypeDesc().equals("I")){
+			fv = cw.visitField(ACC_PUBLIC, paramDec.getIdent().getText(), "I", null, new Integer(0));
+			mv.visitVarInsn(ALOAD, 0);
+			mv.visitVarInsn(ALOAD, 1);
+			mv.visitLdcInsn((int)arg);
+			mv.visitInsn(AALOAD);
+			mv.visitMethodInsn(INVOKESTATIC, "java/lang/Integer", "parseInt", "(Ljava/lang/String;)I", false);
+			mv.visitFieldInsn(PUTFIELD, className, paramDec.getIdent().getText(), "I");
 		}
-		else if(paramDec.getType().equals(TypeName.INTEGER)){
-			mv.visitFieldInsn(PUTFIELD, className, paramDec.firstToken.getText(), paramDec.getType().getJVMTypeDesc());
+		else if(paramDec.getType().getJVMTypeDesc().equals("Z")){
+			fv = cw.visitField(ACC_PUBLIC, paramDec.getIdent().getText(), "Z", null, new Boolean(false)) ;
+			mv.visitVarInsn(ALOAD, 0);
+			mv.visitVarInsn(ALOAD, 1);
+			mv.visitLdcInsn((int)arg);
+			mv.visitInsn(AALOAD);
+			mv.visitMethodInsn(INVOKESTATIC, "java/lang/Boolean", "parseBoolean", "(Ljava/lang/String;)Z", false);
+			mv.visitFieldInsn(PUTFIELD, className, paramDec.getIdent().getText(), "Z");
 		}
 		return null;
 
@@ -435,7 +457,9 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 
 	@Override
 	public Object visitSleepStatement(SleepStatement sleepStatement, Object arg) throws Exception {
-		assert false : "not yet implemented";
+		sleepStatement.getE().visit(this, arg);
+		mv.visitInsn(I2L);
+		mv.visitMethodInsn(INVOKESTATIC, "java/lang/Thread", "sleep", "(J)V", false);
 		return null;
 	}
 

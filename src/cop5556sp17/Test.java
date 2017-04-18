@@ -2,14 +2,15 @@ package cop5556sp17;
 
 public class Test {
 
-	/**
-	 * @param args
-	 */
-	public static void main(String[] args) {
-		// TODO Auto-generated method stub
-		int i=1;
-		while(i < 10){
-			i++;
-		}
-	}
+int x;
+static int y;
+
+
+int sumXY(int val) throws InterruptedException{
+  x = val;
+  java.lang.Thread.sleep(val);
+  return val;
 }
+
+}
+
