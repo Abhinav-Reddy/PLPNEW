@@ -37,11 +37,11 @@ public class TypeCheckVisitor implements ASTVisitor {
 			else if (ch.getType().equals(FILE) && ce.getType().equals(IMAGE)){
 				binaryChain.setType(IMAGE);
 			}
-			else if (ch.getType().equals(FRAME) && 
+			else if (ch.getType().equals(FRAME) &&
 					ce.getFirstToken().isAmongKind(KW_XLOC, KW_YLOC)){
 				binaryChain.setType(INTEGER);
 			}
-			else if (ch.getType().equals(FRAME) && 
+			else if (ch.getType().equals(FRAME) &&
 					ce.getFirstToken().isAmongKind(KW_SHOW, KW_HIDE, KW_MOVE)){
 				binaryChain.setType(FRAME);
 			}
@@ -108,7 +108,7 @@ public class TypeCheckVisitor implements ASTVisitor {
 				throw new TypeCheckException("Error");
 			}
 		break;
-		
+
 		case TIMES:
 			if (e1.getType().equals(INTEGER) && e2.getType().equals(INTEGER))
 				binaryExpression.setType(INTEGER);
@@ -119,14 +119,14 @@ public class TypeCheckVisitor implements ASTVisitor {
 			else
 				throw new TypeCheckException("Error");
 		break;
-		
+
 		case DIV:
 			if (e1.getType().equals(INTEGER) && e2.getType().equals(INTEGER))
 				binaryExpression.setType(INTEGER);
 			else
 				throw new TypeCheckException("Error");
 		break;
-		
+
 		case LT:
 		case GT:
 		case LE:
@@ -138,7 +138,7 @@ public class TypeCheckVisitor implements ASTVisitor {
 			else
 				throw new TypeCheckException("Error");
 		break;
-		
+
 		case EQUAL:
 		case NOTEQUAL:
 			if (e1.getType().equals(e2.getType()))
@@ -160,7 +160,7 @@ public class TypeCheckVisitor implements ASTVisitor {
 		ArrayList<Dec> dec = block.getDecs();
 		ArrayList<Statement>st = block.getStatements();
 		for (i=0, j=0; i<dec.size() && j<st.size();){
-			
+
 			if (dec.get(i).firstToken.pos < st.get(j).firstToken.pos){
 				dec.get(i).visit(this, arg);
 				i++;
@@ -170,11 +170,11 @@ public class TypeCheckVisitor implements ASTVisitor {
 				j++;
 			}
 		}
-		
+
 		for (; i<dec.size(); i++){
 			dec.get(i).visit(this, arg);
 		}
-		
+
 		for (; j<st.size(); j++){
 			st.get(j).visit(this, arg);
 		}
@@ -301,6 +301,9 @@ public class TypeCheckVisitor implements ASTVisitor {
 	@Override
 	public Object visitDec(Dec declaration, Object arg) throws Exception {
 		// Implemented this
+		if (symtab.IsAlreadyDeclared(declaration.getIdent().getText())){
+			throw new TypeCheckException("Error");
+		}
 		symtab.insert(declaration.getIdent().getText(), declaration);
 		return null;
 	}
@@ -338,6 +341,7 @@ public class TypeCheckVisitor implements ASTVisitor {
 			throw new TypeCheckException("Error");
 		else {
 			identX.setDec(d);
+
 		}
 		return null;
 	}
