@@ -310,7 +310,13 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 				slotNo++;
 			}
 			else{
-				st.get(j).visit(this, slotNo);
+				if (st.get(j) instanceof Chain){
+					st.get(j).visit(this, 0);
+					mv.visitInsn(POP);
+				}
+				else{
+					st.get(j).visit(this, slotNo);
+				}
 				j++;
 			}
 		}
@@ -371,7 +377,10 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 
 	@Override
 	public Object visitIdentChain(IdentChain identChain, Object arg) throws Exception {
-		assert false : "not yet implemented";
+
+		if ((int)arg == 0){
+
+		}
 		return null;
 	}
 
@@ -423,7 +432,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 	@Override
 	public Object visitIntLitExpression(IntLitExpression intLitExpression, Object arg) throws Exception {
 		//TODO Implement this
-		mv.visitIntInsn(BIPUSH, intLitExpression.value);
+		mv.visitLdcInsn(intLitExpression.value);
 		return null;
 	}
 
@@ -437,7 +446,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 			fv = cw.visitField(ACC_PUBLIC, paramDec.getIdent().getText(), "I", null, new Integer(0));
 			mv.visitVarInsn(ALOAD, 0);
 			mv.visitVarInsn(ALOAD, 1);
-			mv.visitLdcInsn((int)arg);
+			mv.visitIntInsn(SIPUSH, (int)arg);
 			mv.visitInsn(AALOAD);
 			mv.visitMethodInsn(INVOKESTATIC, "java/lang/Integer", "parseInt", "(Ljava/lang/String;)I", false);
 			mv.visitFieldInsn(PUTFIELD, className, paramDec.getIdent().getText(), "I");
@@ -446,7 +455,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 			fv = cw.visitField(ACC_PUBLIC, paramDec.getIdent().getText(), "Z", null, new Boolean(false)) ;
 			mv.visitVarInsn(ALOAD, 0);
 			mv.visitVarInsn(ALOAD, 1);
-			mv.visitLdcInsn((int)arg);
+			mv.visitIntInsn(BIPUSH, (int)arg);
 			mv.visitInsn(AALOAD);
 			mv.visitMethodInsn(INVOKESTATIC, "java/lang/Boolean", "parseBoolean", "(Ljava/lang/String;)Z", false);
 			mv.visitFieldInsn(PUTFIELD, className, paramDec.getIdent().getText(), "Z");
