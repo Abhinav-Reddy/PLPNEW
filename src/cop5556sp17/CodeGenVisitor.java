@@ -1,21 +1,18 @@
 package cop5556sp17;
 
+import java.io.File;
 import java.io.PrintWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.lang.model.element.Element;
 
-import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.util.TraceClassVisitor;
 
 import cop5556sp17.Scanner.Kind;
 import cop5556sp17.Scanner.Token;
@@ -194,7 +191,43 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 
 	@Override
 	public Object visitBinaryChain(BinaryChain binaryChain, Object arg) throws Exception {
-		assert false : "not yet implemented";
+
+		binaryChain.getE0().visit(this, 0);
+
+		if (binaryChain.getE0().getType().equals(URL)){
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageIO.className, "readFromURL", PLPRuntimeImageIO.readFromURLSig, false);
+		}
+		else if (binaryChain.getE0().getType().equals(TypeName.FILE)){
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageIO.className, "readFromFile", PLPRuntimeImageIO.readFromFileDesc, false);;
+		}
+
+		if (binaryChain.getE1().firstToken.isAmongKind(OP_CONVOLVE, OP_BLUR, OP_GRAY)){
+			if (binaryChain.getArrow().isKind(BARARROW))
+				mv.visitInsn(DUP);
+			else
+				mv.visitInsn(ACONST_NULL);
+		}
+
+		binaryChain.getE1().visit(this, 1);
+
+
+		if (binaryChain.getE1() instanceof IdentChain){
+
+			if (binaryChain.getE1().getDec() instanceof ParamDec){
+				mv.visitVarInsn(ALOAD, 0);
+				mv.visitFieldInsn(GETFIELD, className, binaryChain.getE1().getDec().getIdent().getText(),
+						binaryChain.getE1().getDec().getType().getJVMTypeDesc());
+
+			}
+			else{
+				if (binaryChain.getE1().getDec().getType()==TypeName.INTEGER) {
+					mv.visitVarInsn(ILOAD, binaryChain.getE1().getDec().getSlot());
+				} else {
+					mv.visitVarInsn(ALOAD, binaryChain.getE1().getDec().getSlot());
+				}
+			}
+		}
+
 		return null;
 	}
 
@@ -264,25 +297,49 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 			//mv.visitInsn();
 			break;
 		case PLUS:
-			mv.visitInsn(IADD);
+			if (binaryExpression.getType() == TypeName.INTEGER) {
+				mv.visitInsn(IADD);
+			} else {
+				mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageOps.JVMName, "add", PLPRuntimeImageOps.addSig, false);
+			}
+
 			break;
 		case MINUS:
-			mv.visitInsn(ISUB);
+			if (binaryExpression.getType() == TypeName.INTEGER) {
+				mv.visitInsn(ISUB);
+			} else {
+				mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageOps.JVMName, "sub", PLPRuntimeImageOps.subSig, false);
+			}
 			break;
 		case OR:
 			mv.visitInsn(IOR);
 			break;
 		case TIMES:
-			mv.visitInsn(IMUL);
+			if (binaryExpression.getType() == TypeName.INTEGER) {
+				mv.visitInsn(IMUL);
+			}else if ((binaryExpression.getE0().getType() == TypeName.INTEGER) && (binaryExpression.getE1().getType() == TypeName.IMAGE)) {
+				mv.visitInsn(SWAP);
+				mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageOps.JVMName, "mul", PLPRuntimeImageOps.mulSig, false);
+			} else {
+				mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageOps.JVMName, "mul", PLPRuntimeImageOps.mulSig, false);
+			}
 			break;
 		case DIV:
-			mv.visitInsn(IDIV);
+			if (binaryExpression.getType() == TypeName.INTEGER) {
+				mv.visitInsn(IDIV);
+			} else {
+					mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageOps.JVMName, "mod", PLPRuntimeImageOps.modSig, false);
+			}
 			break;
 		case AND:
 			mv.visitInsn(IAND);
 			break;
 		case MOD:
-			mv.visitInsn(IREM);
+			if (binaryExpression.getType() == TypeName.INTEGER) {
+				mv.visitInsn(IREM);
+			} else {
+				mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageOps.JVMName, "mod", PLPRuntimeImageOps.modSig, false);
+			}
 			break;
 		default:
 			break;
@@ -307,7 +364,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 				slotNo++;
 			}
 			else{
-				if (st.get(j) instanceof Chain){
+				if (st.get(j) instanceof BinaryChain){
 					st.get(j).visit(this, 0);
 					mv.visitInsn(POP);
 				}
@@ -324,7 +381,13 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 		}
 
 		for (; j<st.size(); j++){
-			st.get(j).visit(this, slotNo);
+			if (st.get(j) instanceof BinaryChain){
+				st.get(j).visit(this, 0);
+				mv.visitInsn(POP);
+			}
+			else{
+				st.get(j).visit(this, slotNo);
+			}
 		}
 		Label endLabel = new Label();
 		mv.visitLabel(endLabel);
@@ -348,7 +411,13 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 
 	@Override
 	public Object visitConstantExpression(ConstantExpression constantExpression, Object arg) {
-		assert false : "not yet implemented";
+		if (constantExpression.firstToken.isKind(Kind.KW_SCREENHEIGHT)) {
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "getScreenHeight",
+					PLPRuntimeFrame.getScreenHeightSig, false);
+		} else if (constantExpression.firstToken.isKind(Kind.KW_SCREENWIDTH)) {
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "getScreenWidth",
+					PLPRuntimeFrame.getScreenWidthSig, false);
+		}
 		return null;
 	}
 
@@ -358,7 +427,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 
 		declaration.setSlot((int)arg);
 		if (declaration.getType() == TypeName.IMAGE || declaration.getType() == TypeName.FRAME){
-			mv.visitInsn(NULL);
+			mv.visitInsn(ACONST_NULL);
 			mv.visitVarInsn(ASTORE, declaration.getSlot());
 		}
 		return null;
@@ -367,19 +436,15 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 	@Override
 	public Object visitFilterOpChain(FilterOpChain filterOpChain, Object arg) throws Exception {
 
-		if ((int)arg == 1){
-			mv.visitInsn(DUP);
-		}
-		else
-			mv.visitInsn(NULL);
+
 		if (filterOpChain.getFirstToken().kind == Kind.OP_BLUR){
-			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFilterOps.JVMName, "blurop", PLPRuntimeFilterOps.opSig, false);
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFilterOps.JVMName, "blurOp", PLPRuntimeFilterOps.opSig, false);
 		}
 		else if (filterOpChain.getFirstToken().kind == OP_CONVOLVE){
-			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFilterOps.JVMName, "convolveop", PLPRuntimeFilterOps.opSig, false);
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFilterOps.JVMName, "convolveOp", PLPRuntimeFilterOps.opSig, false);
 		}
 		else if (filterOpChain.getFirstToken().kind == Kind.OP_GRAY){
-			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFilterOps.JVMName, "grayop", PLPRuntimeFilterOps.opSig, false);
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFilterOps.JVMName, "grayOp", PLPRuntimeFilterOps.opSig, false);
 		}
 		return null;
 	}
@@ -390,19 +455,19 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 
 		switch (frameOpChain.firstToken.kind){
 		case KW_HIDE:
-			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "hideImage", PLPRuntimeFrame.hideImageDesc, false);
+			mv.visitMethodInsn(INVOKEVIRTUAL, PLPRuntimeFrame.JVMClassName, "hideImage", PLPRuntimeFrame.hideImageDesc, false);
 		break;
 		case KW_SHOW:
-			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "showImage", PLPRuntimeFrame.showImageDesc, false);
+			mv.visitMethodInsn(INVOKEVIRTUAL, PLPRuntimeFrame.JVMClassName, "showImage", PLPRuntimeFrame.showImageDesc, false);
 		break;
 		case KW_MOVE:
-			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "moveFrame", PLPRuntimeFrame.moveFrameDesc, false);
+			mv.visitMethodInsn(INVOKEVIRTUAL, PLPRuntimeFrame.JVMClassName, "moveFrame", PLPRuntimeFrame.moveFrameDesc, false);
 		break;
 		case KW_XLOC:
-			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "getXVal", PLPRuntimeFrame.getXValDesc, false);
+			mv.visitMethodInsn(INVOKEVIRTUAL, PLPRuntimeFrame.JVMClassName, "getXVal", PLPRuntimeFrame.getXValDesc, false);
 		break;
 		case KW_YLOC:
-			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "getYVal", PLPRuntimeFrame.getYValDesc, false);
+			mv.visitMethodInsn(INVOKEVIRTUAL, PLPRuntimeFrame.JVMClassName, "getYVal", PLPRuntimeFrame.getYValDesc, false);
 		break;
 		default:
 			break;
@@ -415,7 +480,11 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 
 		//arg is 0 for left side
 		if ((int)arg == 0){
-			if (identChain.getDec() instanceof Dec){
+			if (identChain.getDec() instanceof ParamDec){
+				mv.visitVarInsn(ALOAD, 0);
+				mv.visitFieldInsn(GETFIELD, className, identChain.getFirstToken().getText(), identChain.getType().getJVMTypeDesc());
+			}
+			else{
 				if (identChain.getDec().getType() == TypeName.INTEGER){
 					mv.visitVarInsn(ILOAD, identChain.getDec().getSlot());
 				}
@@ -425,25 +494,11 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 				else if (identChain.getDec().getType() == TypeName.FRAME){
 					mv.visitVarInsn(ALOAD, identChain.getDec().getSlot());
 				}
-			}
-			else{
-				mv.visitVarInsn(ALOAD, 0);
-				mv.visitFieldInsn(GETFIELD, className, identChain.getFirstToken().getText(), identChain.getType().getJVMTypeDesc());
+
 			}
 		}
 		else{
-			if (identChain.getDec() instanceof Dec){
-				if (identChain.getDec().getType() == TypeName.INTEGER){
-					mv.visitVarInsn(ISTORE, identChain.getDec().getSlot());
-				}
-				else if (identChain.getDec().getType() == TypeName.IMAGE){
-					mv.visitVarInsn(ASTORE, identChain.getDec().getSlot());
-				}
-				else if (identChain.getDec().getType() == FRAME){
-					mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "createOrSetFrame", PLPRuntimeFrame.createOrSetFrameSig, false);
-				}
-			}
-			else{
+			if (identChain.getDec() instanceof ParamDec){
 				if (identChain.getDec().getType() == TypeName.INTEGER){
 					mv.visitVarInsn(ALOAD, 0);
 					mv.visitInsn(SWAP);
@@ -455,7 +510,19 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 							identChain.getDec().getType().getJVMTypeDesc());
 					mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageIO.className, "write",
 							PLPRuntimeImageIO.writeImageDesc, false);
-					mv.visitInsn(POP);
+				}
+			}
+			else{
+				if (identChain.getDec().getType() == TypeName.INTEGER){
+					mv.visitVarInsn(ISTORE, identChain.getDec().getSlot());
+				}
+				else if (identChain.getDec().getType() == TypeName.IMAGE){
+					mv.visitVarInsn(ASTORE, identChain.getDec().getSlot());
+				}
+				else if (identChain.getDec().getType() == FRAME){
+					mv.visitVarInsn(ALOAD, identChain.getDec().getSlot());
+					mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "createOrSetFrame", PLPRuntimeFrame.createOrSetFrameSig, false);
+					mv.visitVarInsn(ASTORE, identChain.getDec().getSlot());
 				}
 			}
 		}
@@ -470,7 +537,12 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 			mv.visitFieldInsn(GETFIELD, className, identExpression.getFirstToken().getText(), identExpression.getType().getJVMTypeDesc());
 		}
 		else{
-			mv.visitVarInsn(ILOAD, identExpression.getDec().getSlot());
+			if (identExpression.getType() == TypeName.INTEGER
+					|| identExpression.getType() == TypeName.BOOLEAN) {
+				mv.visitVarInsn(ILOAD, identExpression.getDec().getSlot());
+			} else {
+				mv.visitVarInsn(ALOAD, identExpression.getDec().getSlot());
+			}
 		}
 		return null;
 	}
@@ -484,7 +556,16 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 			mv.visitFieldInsn(PUTFIELD, className, identX.getFirstToken().getText(), identX.getType().getJVMTypeDesc());
 		}
 		else{
-			mv.visitVarInsn(ISTORE, identX.getDec().getSlot());
+			if (identX.getDec().getType() == TypeName.INTEGER || identX.getDec().getType() == TypeName.BOOLEAN) {
+				mv.visitVarInsn(ISTORE, identX.getDec().getSlot());
+			}
+			else if (identX.getDec().getType() == IMAGE) {
+				mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageOps.JVMName, "copyImage",
+						PLPRuntimeImageOps.copyImageSig, false);
+				mv.visitVarInsn(ASTORE, identX.getDec().getSlot());
+			}else {
+				mv.visitVarInsn(ASTORE, identX.getDec().getSlot());
+			}
 		}
 		return null;
 
@@ -553,6 +634,26 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 			mv.visitInsn(AALOAD);
 			mv.visitMethodInsn(INVOKESTATIC, "java/lang/Boolean", "parseBoolean", "(Ljava/lang/String;)Z", false);
 			mv.visitFieldInsn(PUTFIELD, className, paramDec.getIdent().getText(), "Z");
+		}
+		else if (paramDec.getType().equals(TypeName.FILE)){
+			cw.visitField(ACC_PUBLIC, paramDec.getIdent().getText(), paramDec.getType().getJVMTypeDesc(), null, null);
+			mv.visitVarInsn(ALOAD, 0);
+			mv.visitTypeInsn(NEW, "java/io/File");
+			mv.visitInsn(DUP);
+			mv.visitVarInsn(ALOAD, 1);
+			mv.visitIntInsn(BIPUSH, (int)arg);
+			mv.visitInsn(AALOAD);
+			mv.visitMethodInsn(INVOKESPECIAL, "java/io/File", "<init>", "(Ljava/lang/String;)V", false);
+			mv.visitFieldInsn(PUTFIELD, className, paramDec.getIdent().getText(), "Ljava/io/File;");
+		}
+
+		else if (paramDec.getType().equals(TypeName.URL)){
+			cw.visitField(ACC_PUBLIC, paramDec.getIdent().getText(), paramDec.getType().getJVMTypeDesc(), null, null);
+			mv.visitVarInsn(ALOAD, 0);
+			mv.visitVarInsn(ALOAD, 1);
+			mv.visitIntInsn(BIPUSH, (int)arg);
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageIO.className, "getURL", PLPRuntimeImageIO.getURLSig, false);
+			mv.visitFieldInsn(PUTFIELD, className, paramDec.getIdent().getText(), "Ljava/net/URL;");
 		}
 		return null;
 

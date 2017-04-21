@@ -298,7 +298,9 @@ public class TypeCheckVisitorTest {
         assertEquals(IdentChain.class, e0.getClass());
         assertEquals(IdentChain.class, e1.getClass());
 
+
         TypeCheckVisitor typeCheckVisitor = new TypeCheckVisitor();
+        thrown.expect(TypeCheckVisitor.TypeCheckException.class);
         program.visit(typeCheckVisitor, null);
 
         assertEquals(Type.TypeName.IMAGE, e0.getType());
@@ -558,10 +560,12 @@ public class TypeCheckVisitorTest {
         assertEquals(BinaryChain.class, statement.getClass());
         BinaryChain binaryChain = (BinaryChain) statement;
 
+        thrown.expect(TypeCheckVisitor.TypeCheckException.class);
         TypeCheckVisitor typeCheckVisitor = new TypeCheckVisitor();
         program.visit(typeCheckVisitor, null);
 
         assertEquals(Type.TypeName.IMAGE, binaryChain.getType());
+
     }
 
     @Test
@@ -1374,7 +1378,7 @@ public class TypeCheckVisitorTest {
         BinaryExpression binaryExpression = (BinaryExpression) expression;
 
         TypeCheckVisitor typeCheckVisitor = new TypeCheckVisitor();
-        thrown.expect(TypeCheckVisitor.TypeCheckException.class);
+        //thrown.expect(TypeCheckVisitor.TypeCheckException.class);
 
         program.visit(typeCheckVisitor, null);
     }

@@ -66,9 +66,13 @@ public class TypeCheckVisitor implements ASTVisitor {
 						binaryChain.setType(IMAGE);
 					}
 			else if (ch.getType().equals(TypeName.IMAGE) &&
-					ce.getFirstToken().isKind(IDENT)){
+					ce.getFirstToken().isKind(IDENT) && ce.getType().equals(IMAGE)){
 						binaryChain.setType(IMAGE);
 					}
+			else if (ch.getType().equals(TypeName.INTEGER) &&
+					ce.getFirstToken().isKind(IDENT) && ce.getType().equals(INTEGER)){
+				binaryChain.setType(INTEGER);
+			}
 			else{
 				throw new TypeCheckException("Error");
 			}
@@ -123,6 +127,9 @@ public class TypeCheckVisitor implements ASTVisitor {
 		case DIV:
 			if (e1.getType().equals(INTEGER) && e2.getType().equals(INTEGER))
 				binaryExpression.setType(INTEGER);
+			else if (e1.getType().equals(IMAGE) && e2.getType().equals(INTEGER)){
+				binaryExpression.setType(TypeName.IMAGE);
+			}
 			else
 				throw new TypeCheckException("Error");
 		break;
@@ -143,6 +150,24 @@ public class TypeCheckVisitor implements ASTVisitor {
 		case NOTEQUAL:
 			if (e1.getType().equals(e2.getType()))
 				binaryExpression.setType(BOOLEAN);
+			else
+				throw new TypeCheckException("Error");
+		break;
+
+		case AND:
+		case OR:
+			if (e1.getType().equals(BOOLEAN) && e2.getType().equals(BOOLEAN))
+				binaryExpression.setType(BOOLEAN);
+			else {
+				throw new TypeCheckException("Error");
+			}
+
+		case MOD:
+			if (e1.getType().equals(INTEGER) && e2.getType().equals(INTEGER))
+				binaryExpression.setType(INTEGER);
+			else if (e1.getType().equals(IMAGE) && e2.getType().equals(INTEGER)){
+				binaryExpression.setType(TypeName.IMAGE);
+			}
 			else
 				throw new TypeCheckException("Error");
 		break;
@@ -196,6 +221,7 @@ public class TypeCheckVisitor implements ASTVisitor {
 			throw new TypeCheckException("Error");
 		}
 		filterOpChain.setType(TypeName.IMAGE);
+
 		return null;
 	}
 
@@ -221,6 +247,7 @@ public class TypeCheckVisitor implements ASTVisitor {
 				throw new TypeCheckException("Error");
 			}
 			frameOpChain.setType(NONE);
+			tp.visit(this, arg);
 		}
 		else{
 			throw new TypeCheckException("Error");
@@ -232,6 +259,7 @@ public class TypeCheckVisitor implements ASTVisitor {
 	public Object visitIdentChain(IdentChain identChain, Object arg) throws Exception {
 		// Implemented this
 		//identChain.setType();
+
 		Token first = identChain.getFirstToken();
 		Dec d = symtab.lookup(first.getText());
 		if (d == null){
@@ -239,6 +267,9 @@ public class TypeCheckVisitor implements ASTVisitor {
 		}
 		identChain.setType(d.getType());
 		identChain.setDec(d);
+
+		//System.out.println("TypeCheckVisitor ient "+ identChain.getFirstToken().getText() + d);
+
 		return null;
 	}
 
@@ -249,7 +280,8 @@ public class TypeCheckVisitor implements ASTVisitor {
 		if (d == null){
 			throw new TypeCheckException("Error");
 		}
-		//System.out.println(d.getType());
+
+		//System.out.println("TypeCheckVisitor ient "+ identExpression.getFirstToken().getText() + d);
 		identExpression.setType( d.getType() );
 		identExpression.setDec(d);
 		return null;
@@ -353,6 +385,7 @@ public class TypeCheckVisitor implements ASTVisitor {
 		if (symtab.IsAlreadyDeclared(paramDec.getIdent().getText())){
 			throw new TypeCheckException("Error");
 		}
+
 		symtab.insert(paramDec.getIdent().getText(), paramDec);
 		return null;
 	}
@@ -380,6 +413,7 @@ public class TypeCheckVisitor implements ASTVisitor {
 				throw new TypeCheckException("Error");
 			}
 			imageOpChain.setType(TypeName.IMAGE);
+			tp.visit(this, arg);
 		}
 		return null;
 	}
