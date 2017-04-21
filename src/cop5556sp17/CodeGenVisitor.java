@@ -7,6 +7,8 @@ import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.lang.model.element.Element;
+
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.FieldVisitor;
@@ -135,8 +137,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 		// 1. instantiate an instance of the class being generated, passing the
 		// String[] with command line arguments
 		// 2. invoke the run method.
-		mv = cw.visitMethod(ACC_PUBLIC + ACC_STATIC, "main", "([Ljava/lang/String;)V", null,
-				null);
+		mv = cw.visitMethod(ACC_PUBLIC + ACC_STATIC, "main", "([Ljava/lang/String;)V", null,null);
 		mv.visitCode();
 		Label mainStart = new Label();
 		mv.visitLabel(mainStart);
@@ -187,11 +188,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 		assignStatement.getE().visit(this, arg);
 		CodeGenUtils.genPrint(DEVEL, mv, "\nassignment: " + assignStatement.var.getText() + "=");
 		CodeGenUtils.genPrintTOS(GRADE, mv, assignStatement.getE().getType());
-		//System.out.println("\nassignment: " + assignStatement.var.getText() + "=");
-		//System.out.println(assignStatement.getE().getType());
 		assignStatement.getVar().visit(this, arg);
-		CodeGenUtils.genPrintTOS(GRADE, mv,assignStatement.getE().getType());
-		//System.out.println(assignStatement.getE().getType());
 		return null;
 	}
 
@@ -360,26 +357,107 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 		//TODO Implement this
 
 		declaration.setSlot((int)arg);
+		if (declaration.getType() == TypeName.IMAGE || declaration.getType() == TypeName.FRAME){
+			mv.visitInsn(NULL);
+			mv.visitVarInsn(ASTORE, declaration.getSlot());
+		}
 		return null;
 	}
 
 	@Override
 	public Object visitFilterOpChain(FilterOpChain filterOpChain, Object arg) throws Exception {
-		assert false : "not yet implemented";
+
+		if ((int)arg == 1){
+			mv.visitInsn(DUP);
+		}
+		else
+			mv.visitInsn(NULL);
+		if (filterOpChain.getFirstToken().kind == Kind.OP_BLUR){
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFilterOps.JVMName, "blurop", PLPRuntimeFilterOps.opSig, false);
+		}
+		else if (filterOpChain.getFirstToken().kind == OP_CONVOLVE){
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFilterOps.JVMName, "convolveop", PLPRuntimeFilterOps.opSig, false);
+		}
+		else if (filterOpChain.getFirstToken().kind == Kind.OP_GRAY){
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFilterOps.JVMName, "grayop", PLPRuntimeFilterOps.opSig, false);
+		}
 		return null;
 	}
 
 	@Override
 	public Object visitFrameOpChain(FrameOpChain frameOpChain, Object arg) throws Exception {
-		assert false : "not yet implemented";
+		frameOpChain.getArg().visit(this, arg);
+
+		switch (frameOpChain.firstToken.kind){
+		case KW_HIDE:
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "hideImage", PLPRuntimeFrame.hideImageDesc, false);
+		break;
+		case KW_SHOW:
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "showImage", PLPRuntimeFrame.showImageDesc, false);
+		break;
+		case KW_MOVE:
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "moveFrame", PLPRuntimeFrame.moveFrameDesc, false);
+		break;
+		case KW_XLOC:
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "getXVal", PLPRuntimeFrame.getXValDesc, false);
+		break;
+		case KW_YLOC:
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "getYVal", PLPRuntimeFrame.getYValDesc, false);
+		break;
+		default:
+			break;
+		}
 		return null;
 	}
 
 	@Override
 	public Object visitIdentChain(IdentChain identChain, Object arg) throws Exception {
 
+		//arg is 0 for left side
 		if ((int)arg == 0){
-
+			if (identChain.getDec() instanceof Dec){
+				if (identChain.getDec().getType() == TypeName.INTEGER){
+					mv.visitVarInsn(ILOAD, identChain.getDec().getSlot());
+				}
+				else if (identChain.getDec().getType() == TypeName.IMAGE){
+					mv.visitVarInsn(ALOAD, identChain.getDec().getSlot());
+				}
+				else if (identChain.getDec().getType() == TypeName.FRAME){
+					mv.visitVarInsn(ALOAD, identChain.getDec().getSlot());
+				}
+			}
+			else{
+				mv.visitVarInsn(ALOAD, 0);
+				mv.visitFieldInsn(GETFIELD, className, identChain.getFirstToken().getText(), identChain.getType().getJVMTypeDesc());
+			}
+		}
+		else{
+			if (identChain.getDec() instanceof Dec){
+				if (identChain.getDec().getType() == TypeName.INTEGER){
+					mv.visitVarInsn(ISTORE, identChain.getDec().getSlot());
+				}
+				else if (identChain.getDec().getType() == TypeName.IMAGE){
+					mv.visitVarInsn(ASTORE, identChain.getDec().getSlot());
+				}
+				else if (identChain.getDec().getType() == FRAME){
+					mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeFrame.JVMClassName, "createOrSetFrame", PLPRuntimeFrame.createOrSetFrameSig, false);
+				}
+			}
+			else{
+				if (identChain.getDec().getType() == TypeName.INTEGER){
+					mv.visitVarInsn(ALOAD, 0);
+					mv.visitInsn(SWAP);
+					mv.visitFieldInsn(PUTFIELD, className, identChain.getFirstToken().getText(), identChain.getType().getJVMTypeDesc());
+				}
+				else if (identChain.getDec().getType() == TypeName.FILE){
+					mv.visitVarInsn(ALOAD, 0);
+					mv.visitFieldInsn(GETFIELD, className, identChain.getDec().getIdent().getText(),
+							identChain.getDec().getType().getJVMTypeDesc());
+					mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageIO.className, "write",
+							PLPRuntimeImageIO.writeImageDesc, false);
+					mv.visitInsn(POP);
+				}
+			}
 		}
 		return null;
 	}
@@ -425,7 +503,23 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 
 	@Override
 	public Object visitImageOpChain(ImageOpChain imageOpChain, Object arg) throws Exception {
-		assert false : "not yet implemented";
+		imageOpChain.getArg().visit(this, arg);
+
+		switch (imageOpChain.getFirstToken().kind) {
+		case OP_WIDTH:
+			mv.visitMethodInsn(INVOKEVIRTUAL, "java/awt/image/BufferedImage", "getWidth", "()I", false);
+		break;
+		case OP_HEIGHT:
+			mv.visitMethodInsn(INVOKEVIRTUAL, "java/awt/image/BufferedImage", "getHeight", "()I", false);
+		break;
+
+		case KW_SCALE:
+			mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageOps.JVMName, "scale", PLPRuntimeImageOps.scaleSig, false);
+		break;
+
+		default:
+			break;
+		}
 		return null;
 	}
 
@@ -474,7 +568,9 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 
 	@Override
 	public Object visitTuple(Tuple tuple, Object arg) throws Exception {
-		assert false : "not yet implemented";
+		for (Expression expression : tuple.getExprList()){
+			expression.visit(this, arg);
+		}
 		return null;
 	}
 

@@ -238,6 +238,7 @@ public class TypeCheckVisitor implements ASTVisitor {
 			throw new TypeCheckException("Error");
 		}
 		identChain.setType(d.getType());
+		identChain.setDec(d);
 		return null;
 	}
 

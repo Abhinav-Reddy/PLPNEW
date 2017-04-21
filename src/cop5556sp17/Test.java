@@ -6,18 +6,14 @@ int x;
 static int y;
 
 
-int sumXY(int val) throws InterruptedException{
+int sumXY(int val, int val2){
   x = val;
-  while(x > 1){
-	  int j = 0;
-	  j++;
-	  while( j < 2){
-		  int i=2;
-		  i++;
-		  x=i;
-	  }
-  }
   return val;
+}
+
+int test2(){
+	x=2;
+	return sumXY(1, 2);
 }
 
 }
