@@ -1,11 +1,6 @@
 package cop5556sp17;
 
-import java.io.File;
-import java.io.PrintWriter;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.List;
 
 
 import org.objectweb.asm.ClassWriter;
@@ -22,8 +17,6 @@ import cop5556sp17.AST.BinaryChain;
 import cop5556sp17.AST.BinaryExpression;
 import cop5556sp17.AST.Block;
 import cop5556sp17.AST.BooleanLitExpression;
-import cop5556sp17.AST.Chain;
-import cop5556sp17.AST.ChainElem;
 import cop5556sp17.AST.ConstantExpression;
 import cop5556sp17.AST.Dec;
 import cop5556sp17.AST.Expression;

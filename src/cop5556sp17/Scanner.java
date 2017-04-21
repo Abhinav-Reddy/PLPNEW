@@ -3,25 +3,24 @@ package cop5556sp17;
 import java.util.ArrayList;
 import java.util.Collections;
 
-import cop5556sp17.Parser.SyntaxException;
 
 public class Scanner {
 	/**
 	 * Kind enum
 	 */
-	
+
 	public static enum Kind {
-		IDENT(""), INT_LIT(""), KW_INTEGER("integer"), KW_BOOLEAN("boolean"), 
-		KW_IMAGE("image"), KW_URL("url"), KW_FILE("file"), KW_FRAME("frame"), 
-		KW_WHILE("while"), KW_IF("if"), KW_TRUE("true"), KW_FALSE("false"), 
-		SEMI(";"), COMMA(","), LPAREN("("), RPAREN(")"), LBRACE("{"), 
-		RBRACE("}"), ARROW("->"), BARARROW("|->"), OR("|"), AND("&"), 
-		EQUAL("=="), NOTEQUAL("!="), LT("<"), GT(">"), LE("<="), GE(">="), 
-		PLUS("+"), MINUS("-"), TIMES("*"), DIV("/"), MOD("%"), NOT("!"), 
-		ASSIGN("<-"), OP_BLUR("blur"), OP_GRAY("gray"), OP_CONVOLVE("convolve"), 
-		KW_SCREENHEIGHT("screenheight"), KW_SCREENWIDTH("screenwidth"), 
-		OP_WIDTH("width"), OP_HEIGHT("height"), KW_XLOC("xloc"), KW_YLOC("yloc"), 
-		KW_HIDE("hide"), KW_SHOW("show"), KW_MOVE("move"), OP_SLEEP("sleep"), 
+		IDENT(""), INT_LIT(""), KW_INTEGER("integer"), KW_BOOLEAN("boolean"),
+		KW_IMAGE("image"), KW_URL("url"), KW_FILE("file"), KW_FRAME("frame"),
+		KW_WHILE("while"), KW_IF("if"), KW_TRUE("true"), KW_FALSE("false"),
+		SEMI(";"), COMMA(","), LPAREN("("), RPAREN(")"), LBRACE("{"),
+		RBRACE("}"), ARROW("->"), BARARROW("|->"), OR("|"), AND("&"),
+		EQUAL("=="), NOTEQUAL("!="), LT("<"), GT(">"), LE("<="), GE(">="),
+		PLUS("+"), MINUS("-"), TIMES("*"), DIV("/"), MOD("%"), NOT("!"),
+		ASSIGN("<-"), OP_BLUR("blur"), OP_GRAY("gray"), OP_CONVOLVE("convolve"),
+		KW_SCREENHEIGHT("screenheight"), KW_SCREENWIDTH("screenwidth"),
+		OP_WIDTH("width"), OP_HEIGHT("height"), KW_XLOC("xloc"), KW_YLOC("yloc"),
+		KW_HIDE("hide"), KW_SHOW("show"), KW_MOVE("move"), OP_SLEEP("sleep"),
 		KW_SCALE("scale"), EOF("eof");
 
 		Kind(String text) {
@@ -43,7 +42,7 @@ public class Scanner {
 			super(message);
 		}
 	}
-	
+
 	/**
 	 * Thrown by Scanner when an int literal is not a value that can be represented by an int.
 	 */
@@ -53,7 +52,7 @@ public class Scanner {
 		super(message);
 		}
 	}
-	
+
 
 	/**
 	 * Holds the line and position in the line of a token.
@@ -61,7 +60,7 @@ public class Scanner {
 	static class LinePos {
 		public final int line;
 		public final int posInLine;
-		
+
 		public LinePos(int line, int posInLine) {
 			super();
 			this.line = line;
@@ -73,9 +72,9 @@ public class Scanner {
 			return "LinePos [line=" + line + ", posInLine=" + posInLine + "]";
 		}
 	}
-		
 
-	
+
+
 
 	public class Token {
 		public final Kind kind;
@@ -87,7 +86,7 @@ public class Scanner {
 			//IMPLEMENTED THIS
 			return chars.substring(pos, pos+length);
 		}
-		
+
 		//returns a LinePos object representing the line and column of this Token
 		LinePos getLinePos(){
 			//IMPLEMENTED THIS
@@ -106,11 +105,11 @@ public class Scanner {
 			this.length = length;
 		}
 
-		/** 
+		/**
 		 * Precondition:  kind = Kind.INT_LIT,  the text can be represented with a Java int.
 		 * Note that the validity of the input should have been checked when the Token was created.
 		 * So the exception should never be thrown.
-		 * 
+		 *
 		 * @return  int value of this token, which should represent an INT_LIT
 		 * @throws NumberFormatException
 		 */
@@ -118,11 +117,11 @@ public class Scanner {
 			//IMPLEMENTED THIS
 			return Integer.parseInt(chars.substring(pos, pos+length));
 		}
-		
+
 		public boolean isKind(Kind k){
 			return kind.equals(k);
 		}
-		
+
 		public boolean isAmongKind(Kind... kinds) {
 			// Added this method
 			for (Kind arg:kinds){
@@ -132,7 +131,7 @@ public class Scanner {
 			}
 			return false;
 		}
-		
+
 		@Override
 		  public int hashCode() {
 		   final int prime = 31;
@@ -171,13 +170,13 @@ public class Scanner {
 		   return true;
 		  }
 
-		 
+
 		  private Scanner getOuterType() {
 		   return Scanner.this;
 		  }
 	}
 
-	 
+
 
 ArrayList<Integer> lineStartPos;
 
@@ -193,17 +192,17 @@ ArrayList<Integer> lineStartPos;
 		IN_IDENT,
 		IN_COMMENT;
 	}
-	
-	
+
+
 	public int skipWhiteSpace(int pos){
 		while(pos< chars.length() && chars.charAt(pos) != '\n' && Character.isWhitespace(chars.charAt(pos))){
 			pos++;
 		}
 		return pos;
 	}
-	
+
 	public Boolean checkForIntOverflow(int startPos, int pos){
-		
+
 		try {
 			Integer.parseInt(chars.substring(startPos, pos));
 			return false;
@@ -211,17 +210,17 @@ ArrayList<Integer> lineStartPos;
 			// TODO: handle exception
 			return true;
 		}
-		
-		
+
+
 	}
-	
+
 	public Boolean IsIdentifierStart(char ch){
 		return ((ch >= 'A' && ch<= 'Z') || (ch >= 'a' && ch <= 'z') || ch == '$' || ch == '_');
 	}
-	
+
 	/**
 	 * Initializes Scanner object by traversing chars and adding tokens to tokens list.
-	 * 
+	 *
 	 * @return this scanner
 	 * @throws IllegalCharException
 	 * @throws IllegalNum,berException
@@ -236,7 +235,7 @@ ArrayList<Integer> lineStartPos;
 		char ch;
 		while (pos < length) {
 			ch = chars.charAt(pos);
-			
+
 			switch (state) {
 				case START: {
 					pos = skipWhiteSpace(pos);
@@ -252,12 +251,12 @@ ArrayList<Integer> lineStartPos;
 						state = State.START;
 					} break;
 					case '\n': {
-						
+
 						//System.out.println(pos);
 						//System.out.println("Inside new line");
 						pos++;
 						lineStartPos.add(pos);
-						
+
 					} break;
 					case '/': {
 						pos++;
@@ -393,8 +392,8 @@ ArrayList<Integer> lineStartPos;
 						pos++;
 						state = State.START;
 					} break;
-					
-					default: { 
+
+					default: {
 						if (Character.isDigit(ch)){
 							state = State.IN_DIGIT;pos++;
 						}else if (IsIdentifierStart(ch)) {
@@ -410,7 +409,7 @@ ArrayList<Integer> lineStartPos;
 						state = State.IN_DIGIT;pos++;
 					}else if (checkForIntOverflow(startPos, pos)) {
 						throw new IllegalNumberException("Number out of range for int type "+chars.substring(startPos, pos));
-					} 
+					}
 					else {
 						tokens.add(new Token(Kind.INT_LIT, startPos, pos - startPos));
 						state = State.START;
@@ -449,7 +448,7 @@ ArrayList<Integer> lineStartPos;
 				default:  assert false;
 			}// switch(state)
 		} // while
-		
+
 		switch (state) {
 			case IN_DIGIT:{
 				if (checkForIntOverflow(startPos, pos)){
@@ -475,7 +474,7 @@ ArrayList<Integer> lineStartPos;
 				break;
 		}
 		tokens.add(new Token(Kind.EOF, pos, 0));
-		return this;  
+		return this;
 	}
 
 
@@ -486,14 +485,14 @@ ArrayList<Integer> lineStartPos;
 
 	/*
 	 * Return the next token in the token list and update the state so that
-	 * the next call will return the Token..  
+	 * the next call will return the Token..
 	 */
 	public Token nextToken() {
 		if (tokenNum >= tokens.size())
 			return null;
 		return tokens.get(tokenNum++);
 	}
-	
+
 	/*
 	 * Return the next token in the token list without updating the state.
 	 * (So the following call to next will return the same token.)
@@ -501,17 +500,17 @@ ArrayList<Integer> lineStartPos;
 	public Token peek(){
 		if (tokenNum >= tokens.size())
 			return null;
-		return tokens.get(tokenNum);		
+		return tokens.get(tokenNum);
 	}
 
-	
+
 
 	/**
-	 * Returns a LinePos object containing the line and position in line of the 
-	 * given token.  
-	 * 
+	 * Returns a LinePos object containing the line and position in line of the
+	 * given token.
+	 *
 	 * Line numbers start counting at 0
-	 * 
+	 *
 	 * @param t
 	 * @return
 	 */

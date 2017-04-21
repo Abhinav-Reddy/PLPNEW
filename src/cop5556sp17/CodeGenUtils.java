@@ -1,6 +1,5 @@
 package cop5556sp17;
 
-import java.io.OutputStream;
 import java.io.PrintStream;
 /**
  * This class contains several static methods useful when developing
@@ -140,16 +139,20 @@ public class CodeGenUtils{
 	 */
 	public static void genPrintTOS(boolean GEN, MethodVisitor mv, TypeName type) {
 		if (GEN) {
-			mv.visitInsn(Opcodes.DUP);
+//			mv.visitInsn(Opcodes.DUP);
 //			mv.visitFieldInsn(Opcodes.GETSTATIC, "cop5556sp17/PLPRuntimeLog", "globalLog", "Lcop5556sp17/PLPRuntimeLog;");
 //			mv.visitInsn(Opcodes.SWAP);
 			switch (type) {
 			case INTEGER: {
+
+				mv.visitInsn(Opcodes.DUP);
 				mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Integer","toString","(I)Ljava/lang/String;", false);
 				mv.visitMethodInsn(Opcodes.INVOKESTATIC, "cop5556sp17/PLPRuntimeLog", "globalLogAddEntry", "(Ljava/lang/String;)V", false);
 			}
 				break;
 			case BOOLEAN: {
+
+				mv.visitInsn(Opcodes.DUP);
 				mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Boolean","toString","(Z)Ljava/lang/String;", false);
 				mv.visitMethodInsn(Opcodes.INVOKESTATIC, "cop5556sp17/PLPRuntimeLog", "globalLogAddEntry", "(Ljava/lang/String;)V", false);
 			}
