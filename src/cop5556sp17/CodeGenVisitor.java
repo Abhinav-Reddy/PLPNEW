@@ -321,7 +321,7 @@ public class CodeGenVisitor implements ASTVisitor, Opcodes {
 			if (binaryExpression.getType() == TypeName.INTEGER) {
 				mv.visitInsn(IDIV);
 			} else {
-					mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageOps.JVMName, "mod", PLPRuntimeImageOps.modSig, false);
+					mv.visitMethodInsn(INVOKESTATIC, PLPRuntimeImageOps.JVMName, "div", PLPRuntimeImageOps.divSig, false);
 			}
 			break;
 		case AND:
